@@ -1944,6 +1944,18 @@ local function GetRollDelayColorCode(rollInfo)
     return "|cffffffff"
 end
 
+local function MarkRollAsWinner(item, rollInfo)
+    if not item or not rollInfo or not rollInfo.rollId then
+        return
+    end
+
+    item.selectedRollId = rollInfo.rollId
+    item.statusText = rollInfo.name .. " mit " .. rollInfo.roll
+    RememberWinner(item, rollInfo)
+    SaveSession()
+    UpdateDialog()
+end
+
 local function ShowRollContextMenu(row, item, rollInfo)
     if not SLM.rollContextMenuFrame then
         SLM.rollContextMenuFrame = CreateFrame("Frame", "SkyvasLootmasterRollContextMenu", UIParent, "UIDropDownMenuTemplate")
@@ -1961,6 +1973,13 @@ local function ShowRollContextMenu(row, item, rollInfo)
             text = rollText,
             isTitle = true,
             notCheckable = true,
+        },
+        {
+            text = "Als Gewinner markieren",
+            notCheckable = true,
+            func = function()
+                MarkRollAsWinner(item, rollInfo)
+            end,
         },
         {
             text = "Zum vorherigen Item verschieben",
@@ -2025,11 +2044,7 @@ local function AddRollRow(index, item, rollInfo)
         end
 
         row.lastClickTime = nil
-        item.selectedRollId = rollInfo.rollId
-        item.statusText = rollInfo.name .. " mit " .. rollInfo.roll
-        RememberWinner(item, rollInfo)
-        SaveSession()
-        UpdateDialog()
+        MarkRollAsWinner(item, rollInfo)
     end)
     row:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
