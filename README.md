@@ -2,6 +2,7 @@
 
 - WOW Addon für 3.3.5
 - optimiert für Rising Gods und den deutschen Client
+- Tester für englischen Client gesucht
 
 # Funktionen
 ## Allgemein
@@ -23,7 +24,7 @@
 - Automatischer Gruppeninvite über ein selbst festgelegtes Keyword
 - Automatische Zuweisung von Loot / Splitter bzw. Fragmente an die verantwortlichen Spieler
   - Wird nach mit dem Invite zu einem Schlachtzug zurückgesetzt, damit nicht versehentlich die Items falsch zugewiesen werden.
-- Erleichteres Posten von Loot über Tastenkombination + Klick auf Item
+- Erleichteres Posten von Loot über Tastenkombination + Klick auf Item (STRG+ALT+Rechtsklick)
   -  Optional mit Item Stats (Item Slot, Art, Main-Stats)
   -  "BOE" Zusatz
 - Dem Gewinner wird innerhalb von 5 Minuten automatisch das Item ins Handelsfenster gelegt
