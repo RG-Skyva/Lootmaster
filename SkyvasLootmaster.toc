@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: Skyva's Lootmaster
+## Notes: Loot roll helper for WoW 3.3.5 raids.
+## Author: Skyva
+## Version: 1.0.0
+## SavedVariables: SkyvasLootmasterDB
+
+SkyvasLootmaster.xml
