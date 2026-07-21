@@ -2,6 +2,7 @@
 
 - WOW Addon für 3.3.5
 - optimiert für Rising Gods und den deutschen Client
+- Tester für englischen Client gesucht
 
 # Funktionen
 ## Allgemein
