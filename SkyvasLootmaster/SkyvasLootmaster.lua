@@ -3048,6 +3048,11 @@ SLM:SetScript("OnEvent", function(_, event, message, sender, addonChannel, addon
         return
     end
 
+    if event == "BAG_OPEN" then
+        InstallItemShortcut()
+        return
+    end
+
     if event == "CHAT_MSG_ADDON" then
         HandleVersionAddonMessage(message, sender, addonChannel, addonSender)
         return
@@ -3131,6 +3136,7 @@ SLM:RegisterEvent("ADDON_LOADED")
 SLM:RegisterEvent("PLAYER_LOGIN")
 SLM:RegisterEvent("PLAYER_LOGOUT")
 SLM:RegisterEvent("RAID_ROSTER_UPDATE")
+SLM:RegisterEvent("BAG_OPEN")
 SLM:RegisterEvent("TRADE_SHOW")
 SLM:RegisterEvent("LOOT_OPENED")
 SLM:RegisterEvent("LOOT_CLOSED")
