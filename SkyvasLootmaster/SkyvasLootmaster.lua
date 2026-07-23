@@ -3026,22 +3026,6 @@ local function InstallItemShortcut()
             HookItemShortcutButton(_G["ElvUI_Bag" .. bag .. "Slot" .. slot])
         end
     end
-
-    for name, button in pairs(_G) do
-        if type(button) == "table" and type(button.GetObjectType) == "function" and button:GetObjectType() == "Button" then
-            local buttonName = type(button.GetName) == "function" and button:GetName() or name
-            if buttonName and (
-                string.find(buttonName, "ContainerFrame")
-                or string.find(buttonName, "ElvUI")
-                or string.find(buttonName, "Bag")
-            ) then
-                local bag, slot = GetBagSlotFromButton(button)
-                if bag and slot then
-                    HookItemShortcutButton(button)
-                end
-            end
-        end
-    end
 end
 
 SLM:SetScript("OnEvent", function(_, event, message, sender, addonChannel, addonSender)
@@ -3055,10 +3039,8 @@ SLM:SetScript("OnEvent", function(_, event, message, sender, addonChannel, addon
         return
     end
 
-    if event == "PLAYER_LOGIN" or event == "BAG_UPDATE" then
-        if event == "PLAYER_LOGIN" then
-            SLM.wasInRaidGroup = IsInRaidGroup() and true or false
-        end
+    if event == "PLAYER_LOGIN" then
+        SLM.wasInRaidGroup = IsInRaidGroup() and true or false
         InstallItemShortcut()
         InstallWishlistLinkHook()
         InstallChatItemShortcut()
@@ -3149,7 +3131,6 @@ SLM:RegisterEvent("ADDON_LOADED")
 SLM:RegisterEvent("PLAYER_LOGIN")
 SLM:RegisterEvent("PLAYER_LOGOUT")
 SLM:RegisterEvent("RAID_ROSTER_UPDATE")
-SLM:RegisterEvent("BAG_UPDATE")
 SLM:RegisterEvent("TRADE_SHOW")
 SLM:RegisterEvent("LOOT_OPENED")
 SLM:RegisterEvent("LOOT_CLOSED")
