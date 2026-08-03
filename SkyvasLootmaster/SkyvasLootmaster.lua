@@ -33,7 +33,7 @@ local SHARD_ITEM_IDS = {
 
 local GROUP_ORDER = {
     { key = "UlduarMount", label = "Ulduar Mount", range = "50%-100%" },
-    { key = "FR", label = "Fokus Roll", range = "101-200" },
+    { key = "FR", label = "Fokus", range = "101-200" },
     { key = "Main", label = "Main", range = "1-100" },
     { key = "Sec", label = "Second", range = "1-99" },
 }
@@ -548,9 +548,19 @@ local function GetMasterLootSettings()
     end
     settings.lootTarget = settings.lootTarget or ""
     settings.shardTarget = settings.shardTarget or ""
+    settings.shardAssignCount = tonumber(settings.shardAssignCount) or 0
     settings.autoInviteKeyword = settings.autoInviteKeyword or ""
 
     return settings
+end
+
+local function UpdateMasterLootShardCounterText()
+    if not SLM.masterLootShardLabel then
+        return
+    end
+
+    local settings = GetMasterLootSettings()
+    SLM.masterLootShardLabel:SetText("Shard/Frag (" .. (tonumber(settings.shardAssignCount) or 0) .. ")")
 end
 
 local function SaveMasterLootSettings()
@@ -571,12 +581,17 @@ local function SaveMasterLootSettings()
         settings.lootTarget = SLM.masterLootTargetInput:GetText() or ""
     end
     if SLM.masterLootShardInput then
-        settings.shardTarget = SLM.masterLootShardInput:GetText() or ""
+        local shardTarget = SLM.masterLootShardInput:GetText() or ""
+        if settings.shardTarget ~= shardTarget then
+            settings.shardAssignCount = 0
+        end
+        settings.shardTarget = shardTarget
     end
     if SLM.autoInviteInput then
         settings.autoInviteKeyword = SLM.autoInviteInput:GetText() or ""
     end
     SaveSession()
+    UpdateMasterLootShardCounterText()
 end
 
 local function IsInRaidGroup()
@@ -640,6 +655,7 @@ local function ClearMasterLootTargets()
     local settings = GetMasterLootSettings()
     settings.lootTarget = ""
     settings.shardTarget = ""
+    settings.shardAssignCount = 0
 
     if SLM.masterLootTargetInput then
         SLM.masterLootTargetInput:SetText("")
@@ -647,6 +663,7 @@ local function ClearMasterLootTargets()
     if SLM.masterLootShardInput then
         SLM.masterLootShardInput:SetText("")
     end
+    UpdateMasterLootShardCounterText()
 
     SaveSession()
 end
@@ -1138,6 +1155,13 @@ local function GiveLootToCandidate(slot, candidateIndex)
     return false
 end
 
+local function IncrementShardAssignmentCounter()
+    local settings = GetMasterLootSettings()
+    settings.shardAssignCount = (tonumber(settings.shardAssignCount) or 0) + 1
+    SaveSession()
+    UpdateMasterLootShardCounterText()
+end
+
 local function CancelMasterLootAssignments()
     SLM.masterLootPendingAssignments = nil
     SLM.masterLootPendingElapsed = nil
@@ -1179,7 +1203,9 @@ local function ScheduleMasterLootAssignments(assignments)
             return
         end
 
-        GiveLootToCandidate(assignment.slot, assignment.candidateIndex)
+        if GiveLootToCandidate(assignment.slot, assignment.candidateIndex) and assignment.optionKey == "shard" then
+            IncrementShardAssignmentCounter()
+        end
         SLM.masterLootPendingIndex = (SLM.masterLootPendingIndex or 1) + 1
     end)
 end
@@ -1333,6 +1359,119 @@ local function IsPlayerMasterLooter()
     return false
 end
 
+local function UpdateMasterLootIcon()
+    if not SLM.masterLootIcon then
+        return
+    end
+
+    if IsPlayerMasterLooter() then
+        SLM.masterLootIcon:SetAlpha(1)
+    else
+        SLM.masterLootIcon:SetAlpha(0.35)
+    end
+end
+
+local function IsHeroicDifficulty()
+    local inInstance = false
+    if IsInInstance then
+        local ok, isInInstance = pcall(IsInInstance)
+        inInstance = ok and isInInstance and true or false
+    end
+
+    if inInstance and GetInstanceInfo then
+        local ok, _, _, difficultyIndex, _, _, playerDifficulty, isDynamicInstance = pcall(GetInstanceInfo)
+        if ok then
+            difficultyIndex = tonumber(difficultyIndex)
+            playerDifficulty = tonumber(playerDifficulty)
+            if isDynamicInstance then
+                return playerDifficulty == 1
+            end
+
+            return difficultyIndex == 3 or difficultyIndex == 4
+        end
+    end
+
+    if IsInRaidGroup() and GetRaidDifficulty then
+        local ok, _, raidDifficultyMode = pcall(GetRaidDifficulty)
+        raidDifficultyMode = ok and tonumber(raidDifficultyMode) or nil
+        if raidDifficultyMode then
+            return raidDifficultyMode == 3 or raidDifficultyMode == 4
+        end
+    end
+
+    if not IsInRaidGroup() and GetDungeonDifficulty then
+        local ok, dungeonDifficulty, dungeonDifficultyName, _, isHeroic = pcall(GetDungeonDifficulty)
+        dungeonDifficulty = ok and tonumber(dungeonDifficulty) or nil
+        if ok and isHeroic then
+            return true
+        elseif ok and dungeonDifficultyName and type(dungeonDifficultyName) == "string" and string.find(string.lower(dungeonDifficultyName), "hero") then
+            return true
+        elseif ok and dungeonDifficultyName and type(dungeonDifficultyName) == "string" and string.find(string.lower(dungeonDifficultyName), "hc") then
+            return true
+        elseif dungeonDifficulty == 2 then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function UpdateHeroicIcon()
+    if not SLM.heroicIcon then
+        return
+    end
+
+    if IsHeroicDifficulty() then
+        SLM.heroicIcon:SetVertexColor(1, 1, 1)
+        SLM.heroicIcon:SetAlpha(1)
+    else
+        SLM.heroicIcon:SetVertexColor(0.45, 0.45, 0.45)
+        SLM.heroicIcon:SetAlpha(0.75)
+    end
+end
+
+local function UpdateTitleIconButtonLayers()
+    if not SLM.frame then
+        return
+    end
+
+    local iconButtonLevel = SLM.frame:GetFrameLevel() + 20
+    if SLM.masterLootButton then
+        SLM.masterLootButton:SetFrameLevel(iconButtonLevel)
+    end
+    if SLM.heroicButton then
+        SLM.heroicButton:SetFrameLevel(iconButtonLevel + 1)
+    end
+end
+
+local function ScheduleHeroicIconUpdate()
+    if not SLM.heroicIconTimerFrame then
+        SLM.heroicIconTimerFrame = CreateFrame("Frame")
+    end
+
+    SLM.heroicIconPendingElapsed = 0
+    SLM.heroicIconRefreshIndex = 1
+    SLM.heroicIconRefreshDelays = { 1, 3, 6 }
+    SLM.heroicIconTimerFrame:SetScript("OnUpdate", function(self, elapsed)
+        SLM.heroicIconPendingElapsed = (SLM.heroicIconPendingElapsed or 0) + elapsed
+        local refreshDelay = SLM.heroicIconRefreshDelays and SLM.heroicIconRefreshDelays[SLM.heroicIconRefreshIndex or 1]
+        if not refreshDelay then
+            SLM.heroicIconPendingElapsed = nil
+            SLM.heroicIconRefreshIndex = nil
+            SLM.heroicIconRefreshDelays = nil
+            self:SetScript("OnUpdate", nil)
+            return
+        end
+        if SLM.heroicIconPendingElapsed < refreshDelay then
+            return
+        end
+
+        SLM.heroicIconPendingElapsed = 0
+        SLM.heroicIconRefreshIndex = (SLM.heroicIconRefreshIndex or 1) + 1
+        UpdateHeroicIcon()
+    end)
+end
+
 HandleMasterLootOpened = function()
     local settings = GetMasterLootSettings()
     if not settings.enabled or not IsPlayerMasterLooter() or not GetNumLootItems then
@@ -1390,7 +1529,7 @@ HandleMasterLootOpened = function()
     for _, lootInfo in ipairs(lootSlots) do
         local candidateIndex = candidateIndexByName[NormalizePlayerName(lootInfo.targetName)]
         if candidateIndex then
-            table.insert(assignments, { slot = lootInfo.slot, candidateIndex = candidateIndex })
+            table.insert(assignments, { slot = lootInfo.slot, candidateIndex = candidateIndex, optionKey = lootInfo.optionKey })
         else
             ShowMasterLootFallbackDialog(lootInfo.slot, lootInfo.itemLink, lootInfo.targetName, lootInfo.optionKey)
             return
@@ -1473,6 +1612,61 @@ local function SetMasterLootTo(playerName, unitToken, fallbackIndex)
     if fallbackIndex ~= nil then
         pcall(SetLootMethod, "master", fallbackIndex)
     end
+end
+
+local function ToggleMasterLootFromTitle()
+    if IsPlayerMasterLooter() then
+        if SetLootMethod then
+            SetLootMethod("group")
+        end
+    else
+        SetMasterLootTo(UnitName("player"), "player", 0)
+    end
+
+    UpdateTitleIconButtonLayers()
+    UpdateMasterLootIcon()
+end
+
+local function ToggleHeroicDifficultyFromTitle()
+    UpdateTitleIconButtonLayers()
+    UpdateHeroicIcon()
+
+    if IsInRaidGroup() and GetRaidDifficulty and SetRaidDifficulty then
+        local ok, raidDifficulty, raidDifficultyMode = pcall(GetRaidDifficulty)
+        raidDifficulty = ok and tonumber(raidDifficulty) or nil
+        raidDifficultyMode = ok and tonumber(raidDifficultyMode) or nil
+        local targetDifficulty = nil
+
+        if raidDifficultyMode == 1 then
+            targetDifficulty = 3
+        elseif raidDifficultyMode == 2 then
+            targetDifficulty = 4
+        elseif raidDifficultyMode == 3 then
+            targetDifficulty = 1
+        elseif raidDifficultyMode == 4 then
+            targetDifficulty = 2
+        end
+
+        if targetDifficulty then
+            pcall(SetRaidDifficulty, targetDifficulty)
+            UpdateHeroicIcon()
+            ScheduleHeroicIconUpdate()
+            return
+        end
+    end
+
+    if GetDungeonDifficulty and SetDungeonDifficulty then
+        local ok, dungeonDifficulty = pcall(GetDungeonDifficulty)
+        dungeonDifficulty = ok and tonumber(dungeonDifficulty) or nil
+        if dungeonDifficulty == 2 then
+            pcall(SetDungeonDifficulty, 1)
+        else
+            pcall(SetDungeonDifficulty, 2)
+        end
+    end
+
+    UpdateHeroicIcon()
+    ScheduleHeroicIconUpdate()
 end
 
 local function ConfirmMasterLootForPlayerRequest(playerName)
@@ -1944,6 +2138,21 @@ local function GetRollDelayColorCode(rollInfo)
     return "|cffffffff"
 end
 
+local function GetUniqueRollPlayerCount(rolls)
+    local seenPlayers = {}
+    local playerCount = 0
+
+    for _, rollInfo in ipairs(rolls or {}) do
+        local playerKey = NormalizePlayerName(rollInfo.name)
+        if playerKey ~= "" and not seenPlayers[playerKey] then
+            seenPlayers[playerKey] = true
+            playerCount = playerCount + 1
+        end
+    end
+
+    return playerCount
+end
+
 local function MarkRollAsWinner(item, rollInfo)
     if not item or not rollInfo or not rollInfo.rollId then
         return
@@ -2151,6 +2360,7 @@ local function ShowLootView()
         SLM.settingsFrame:Hide()
     end
     SLM.viewToggleButton:SetText("L")
+    UpdateTitleIconButtonLayers()
     UpdateDialog()
 end
 
@@ -2162,6 +2372,7 @@ local function ShowWishlistView()
     end
     SLM.wishlistFrame:Show()
     SLM.viewToggleButton:SetText("W")
+    UpdateTitleIconButtonLayers()
     UpdateWishlistView()
 end
 
@@ -2171,6 +2382,7 @@ local function ShowSettingsView()
     SLM.wishlistFrame:Hide()
     SLM.settingsFrame:Show()
     SLM.viewToggleButton:SetText("S")
+    UpdateTitleIconButtonLayers()
     UpdateMasterLootSettingsView()
 end
 
@@ -2178,6 +2390,9 @@ function UpdateMasterLootSettingsView()
     if not SLM.settingsFrame then
         return
     end
+
+    UpdateMasterLootIcon()
+    UpdateHeroicIcon()
 
     local settings = GetMasterLootSettings()
     SLM.masterLootEnabledButton:SetChecked(settings.enabled and true or false)
@@ -2187,6 +2402,7 @@ function UpdateMasterLootSettingsView()
     SLM.masterLootTargetInput:SetText(settings.lootTarget or "")
     SLM.masterLootShardInput:SetText(settings.shardTarget or "")
     SLM.autoInviteInput:SetText(settings.autoInviteKeyword or "")
+    UpdateMasterLootShardCounterText()
     if settings.locked then
         SLM.masterLootTargetInput:ClearFocus()
         SLM.masterLootShardInput:ClearFocus()
@@ -2211,6 +2427,10 @@ function UpdateDialog()
     if not SLM.frame then
         return
     end
+
+    UpdateTitleIconButtonLayers()
+    UpdateMasterLootIcon()
+    UpdateHeroicIcon()
 
     if SLM.currentView == "wishlist" then
         UpdateWishlistView()
@@ -2272,7 +2492,7 @@ function UpdateDialog()
         if group.key ~= "Main" and table.getn(rolls) == 0 then
             -- Only show optional categories once someone rolled for them.
         else
-        AddRow(rowIndex, group.label .. " (" .. group.range .. ")", 1, 0.82, 0, GetSmallHeaderFont())
+        AddRow(rowIndex, group.label .. " (" .. group.range .. ") - " .. GetUniqueRollPlayerCount(rolls) .. " Spieler", 1, 0.82, 0, GetSmallHeaderFont())
         rowIndex = rowIndex + 1
 
         if table.getn(rolls) == 0 then
@@ -2322,6 +2542,12 @@ local function CreateDialog()
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    frame:SetScript("OnShow", function()
+        UpdateTitleIconButtonLayers()
+        UpdateMasterLootIcon()
+        UpdateHeroicIcon()
+        ScheduleHeroicIconUpdate()
+    end)
     frame:Hide()
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
@@ -2339,10 +2565,64 @@ local function CreateDialog()
         end
     end)
 
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", frame, "TOP", 0, -18)
     title:SetText("Skyva's Lootmaster")
 
+    local masterLootIcon = frame:CreateTexture(nil, "OVERLAY")
+    masterLootIcon:SetWidth(14)
+    masterLootIcon:SetHeight(14)
+    masterLootIcon:SetTexture("Interface\\GroupFrame\\UI-Group-MasterLooter")
+    masterLootIcon:SetPoint("RIGHT", title, "LEFT", -4, 0)
+    masterLootIcon:SetAlpha(0.35)
+
+    local masterLootButton = CreateFrame("Button", "SkyvasLootmasterMasterLootButton", frame)
+    masterLootButton:SetPoint("CENTER", masterLootIcon, "CENTER", 0, 0)
+    masterLootButton:SetWidth(24)
+    masterLootButton:SetHeight(24)
+    masterLootButton:RegisterForClicks("LeftButtonUp")
+    masterLootButton:SetScript("OnClick", function(self, button)
+        if button ~= "LeftButton" then
+            return
+        end
+
+        local now = GetTime()
+        if not self.lastClickTime or now - self.lastClickTime > 0.35 then
+            self.lastClickTime = now
+            return
+        end
+
+        self.lastClickTime = nil
+        ToggleMasterLootFromTitle()
+    end)
+
+    local heroicIcon = frame:CreateTexture(nil, "OVERLAY")
+    heroicIcon:SetWidth(20)
+    heroicIcon:SetHeight(20)
+    heroicIcon:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-HEROIC")
+    heroicIcon:SetPoint("LEFT", title, "RIGHT", 4, -6)
+    heroicIcon:SetVertexColor(0.45, 0.45, 0.45)
+    heroicIcon:SetAlpha(0.75)
+
+    local heroicButton = CreateFrame("Button", "SkyvasLootmasterHeroicButton", frame)
+    heroicButton:SetPoint("CENTER", heroicIcon, "CENTER", 0, 0)
+    heroicButton:SetWidth(28)
+    heroicButton:SetHeight(28)
+    heroicButton:RegisterForClicks("LeftButtonUp")
+    heroicButton:SetScript("OnClick", function(self, button)
+        if button ~= "LeftButton" then
+            return
+        end
+
+        local now = GetTime()
+        if not self.lastClickTime or now - self.lastClickTime > 0.35 then
+            self.lastClickTime = now
+            return
+        end
+
+        self.lastClickTime = nil
+        ToggleHeroicDifficultyFromTitle()
+    end)
     local lootFrame = CreateFrame("Frame", "SkyvasLootmasterLootView", frame)
     lootFrame:SetAllPoints(frame)
 
@@ -2425,11 +2705,11 @@ local function CreateDialog()
     itemText:SetText("Kein Item")
 
     local scroll = CreateFrame("ScrollFrame", "SkyvasLootmasterScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -80)
+    scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 15, -80)
     scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -42, 82)
 
     local content = CreateFrame("Frame", "SkyvasLootmasterScrollContent", scroll)
-    content:SetWidth(150)
+    content:SetWidth(166)
     content:SetHeight(50)
     scroll:SetScrollChild(content)
 
@@ -2724,7 +3004,7 @@ local function CreateDialog()
 
     local masterLootShardLabel = settingsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     masterLootShardLabel:SetPoint("TOPLEFT", masterLootTargetInput, "BOTTOMLEFT", 4, -12)
-    masterLootShardLabel:SetText("Shard/Frag")
+    masterLootShardLabel:SetText("Shard/Frag (0)")
 
     local masterLootShardInput = CreateFrame("EditBox", "SkyvasLootmasterMasterLootShardInput", settingsFrame, "InputBoxTemplate")
     masterLootShardInput:SetPoint("TOPLEFT", masterLootShardLabel, "BOTTOMLEFT", -4, -6)
@@ -2764,6 +3044,10 @@ local function CreateDialog()
 
     SLM.frame = frame
     SLM.viewToggleButton = viewToggleButton
+    SLM.masterLootIcon = masterLootIcon
+    SLM.masterLootButton = masterLootButton
+    SLM.heroicIcon = heroicIcon
+    SLM.heroicButton = heroicButton
     SLM.lootFrame = lootFrame
     SLM.wishlistFrame = wishlistFrame
     SLM.settingsFrame = settingsFrame
@@ -2783,8 +3067,10 @@ local function CreateDialog()
     SLM.assistantWhisperButton = assistantWhisperButton
     SLM.itemStatsButton = itemStatsButton
     SLM.masterLootTargetInput = masterLootTargetInput
+    SLM.masterLootShardLabel = masterLootShardLabel
     SLM.masterLootShardInput = masterLootShardInput
     SLM.autoInviteInput = autoInviteInput
+    UpdateTitleIconButtonLayers()
     UpdateMasterLootSettingsView()
 end
 
@@ -3045,6 +3331,13 @@ SLM:SetScript("OnEvent", function(_, event, message, sender, addonChannel, addon
         InstallWishlistLinkHook()
         InstallChatItemShortcut()
         RegisterVersionMessagePrefix()
+        UpdateHeroicIcon()
+        return
+    end
+
+    if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_DIFFICULTY_CHANGED" or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" or event == "ZONE_CHANGED_NEW_AREA" or event == "INSTANCE_DIFFICULTY_CHANGED" then
+        UpdateHeroicIcon()
+        ScheduleHeroicIconUpdate()
         return
     end
 
@@ -3060,6 +3353,14 @@ SLM:SetScript("OnEvent", function(_, event, message, sender, addonChannel, addon
 
     if event == "RAID_ROSTER_UPDATE" then
         HandleRaidRosterUpdate()
+        UpdateMasterLootIcon()
+        UpdateHeroicIcon()
+        return
+    end
+
+    if event == "PARTY_LOOT_METHOD_CHANGED" then
+        UpdateMasterLootIcon()
+        UpdateHeroicIcon()
         return
     end
 
@@ -3129,13 +3430,21 @@ SlashCmdList.SKYVASLOOTMASTER = function(input)
     RestoreSession()
     CreateDialog()
     SLM.frame:Show()
+    UpdateTitleIconButtonLayers()
     UpdateDialog()
 end
 
 SLM:RegisterEvent("ADDON_LOADED")
 SLM:RegisterEvent("PLAYER_LOGIN")
+SLM:RegisterEvent("PLAYER_ENTERING_WORLD")
+SLM:RegisterEvent("PLAYER_DIFFICULTY_CHANGED")
+SLM:RegisterEvent("ZONE_CHANGED")
+SLM:RegisterEvent("ZONE_CHANGED_INDOORS")
+SLM:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+SLM:RegisterEvent("INSTANCE_DIFFICULTY_CHANGED")
 SLM:RegisterEvent("PLAYER_LOGOUT")
 SLM:RegisterEvent("RAID_ROSTER_UPDATE")
+SLM:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
 SLM:RegisterEvent("BAG_OPEN")
 SLM:RegisterEvent("TRADE_SHOW")
 SLM:RegisterEvent("LOOT_OPENED")
