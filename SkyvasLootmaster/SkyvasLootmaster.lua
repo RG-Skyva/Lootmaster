@@ -1,5 +1,5 @@
 local ADDON_FOLDER = ...
-local ADDON_VERSION = (GetAddOnMetadata and GetAddOnMetadata(ADDON_FOLDER or "SkyvasLootmaster", "Version")) or "1.0"
+local ADDON_VERSION = (GetAddOnMetadata and GetAddOnMetadata(ADDON_FOLDER or "SkyvasLootmaster", "Version")) or "1.1"
 local ADDON_MESSAGE_PREFIX = "SkyvasLM"
 
 SkyvasLootmasterDB = SkyvasLootmasterDB or {}
