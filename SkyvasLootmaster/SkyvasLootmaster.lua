@@ -36,9 +36,11 @@ local GROUP_ORDER = {
     { key = "FR", label = "Fokus", range = "101-200" },
     { key = "Main", label = "Main", range = "1-100" },
     { key = "Sec", label = "Second", range = "1-99" },
+    { key = "Third", label = "Third", range = "1-98" },
 }
 
 local GROUP_LABEL_BY_MAX = {
+    [98] = "Third",
     [99] = "Sec",
     [100] = "Main",
 }
@@ -931,6 +933,7 @@ local function MigrateItem(item)
         FR = {},
         Main = {},
         Sec = {},
+        Third = {},
     }
     item.rollCountByPlayer = item.rollCountByPlayer or {}
     item.nextRollId = item.nextRollId or 1
@@ -1740,10 +1743,12 @@ local function EnsureRollBuckets(item)
         FR = {},
         Main = {},
         Sec = {},
+        Third = {},
     }
     item.rolls.FR = item.rolls.FR or {}
     item.rolls.Main = item.rolls.Main or {}
     item.rolls.Sec = item.rolls.Sec or {}
+    item.rolls.Third = item.rolls.Third or {}
     item.rolls.UlduarMount = item.rolls.UlduarMount or {}
     item.rollCountByPlayer = item.rollCountByPlayer or {}
 end
@@ -3091,6 +3096,7 @@ local function AddItem(itemLink, openDialog)
             FR = {},
             Main = {},
             Sec = {},
+            Third = {},
         },
         rollCountByPlayer = {},
         nextRollId = 1,
@@ -3152,6 +3158,10 @@ local function AnnounceRollItem(itemLink)
     if not itemLink then
         return
     end
+
+    CreateDialog()
+    SLM.frame:Show()
+    ShowLootView()
 
     local analysisItemLink = GetBaseItemLink(itemLink)
     local boeText = ""
