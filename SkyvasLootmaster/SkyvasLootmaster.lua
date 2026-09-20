@@ -3250,19 +3250,24 @@ local function GetBagSlotFromButton(button)
 
     local parent = button:GetParent()
     local bag = button.bagID or button.BagID or button.bag or button.Bag
-    local slot = button.slotID or button.SlotID or button.slot or button.Slot or button:GetID()
+    local slot = button.slotID or button.SlotID or button.slot or button.Slot
+    local name = button:GetName()
+
+    if name and (not bag or not slot) then
+        local nameBag, nameSlot = string.match(name, "Bag(%d+)Slot(%d+)")
+        if not nameBag or not nameSlot then
+            nameBag, nameSlot = string.match(name, "Bag(%d+)Item(%d+)")
+        end
+        bag = bag or tonumber(nameBag)
+        slot = slot or tonumber(nameSlot)
+    end
+
+    if not slot then
+        slot = button:GetID()
+    end
 
     if not bag and parent then
         bag = parent.bagID or parent.BagID or parent.bag or parent.Bag or parent:GetID()
-    end
-
-    if not bag or not slot then
-        local name = button:GetName()
-        if name then
-            local nameBag, nameSlot = string.match(name, "Bag(%d+)Slot(%d+)")
-            bag = bag or tonumber(nameBag)
-            slot = slot or tonumber(nameSlot)
-        end
     end
 
     return tonumber(bag), tonumber(slot)
